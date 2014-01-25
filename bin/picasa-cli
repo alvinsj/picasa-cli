@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+
+require 'PicasaWebAlbums'
+require 'open-uri'
+require 'highline/import'
+require 'fileutils'
+
+begin
+  puts "= Picasa Web Albums Download ="
+
+  username = ask("What is your username? ")
+  password = ask("Password: "){|q| q.echo = "*" }
+  
+  puts "Authorizing username and password..."
+
+  repo = PicasaWebAlbums.get_repository(username, password)
+  albums = repo.get_all_albums
+  
+  albums.each_with_index do |album, idx|
+    puts "#{idx+1}. #{album.title} - #{album.number_of_photos} photos" 
+  end
+
+  album_idx = 1
+  
+  puts "Download albums nos."
+  start_idx = ask("Start: ", Integer)
+  end_idx = ask("End: ", Integer)
+
+  root_dir = "#{Dir.pwd}/downloads" 
+  
+  puts "Saving it to #{root_dir}..."
+
+  albums.each do |album|
+    break if album_idx == (end_idx+1)
+    (album_idx +=1 and next) if album_idx < start_idx
+    
+    folder = "#{root_dir}/#{album.slug}"
+    FileUtils.mkdir_p(folder)
+    
+    photos = repo.get_photos_by_album_id(album.id)
+    photo_idx = 1
+   
+    puts " "
+    puts "=== Downloading Album ##{album_idx}: #{album.title}"
+    
+    photos.each do |photo|
+      file_path = "#{folder}/#{photo.file_name}"
+      (photo_idx += 1 and next) if File.exists?(file_path)
+
+      puts "<Album ##{album_idx}>[#{photo_idx}/#{photos.count}][Downloading](#{album.slug}) #{photo.file_name} "
+      File.open(file_path,"wb") do |file|
+        open(photo.url) do |f|
+          file.puts f.read
+        end
+      end
+      puts "<Album ##{album_idx}>[#{photo_idx}/#{photos.count}][OK](#{album.slug}) #{photo.file_name}"
+      
+      photo_idx += 1
+    end
+
+    album_idx += 1
+  end
+
+rescue Exception => e 
+
+  puts e.message
+  e.backtrace.each{|q| puts q }
+
+end
